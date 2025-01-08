@@ -129,9 +129,40 @@ class modelbb():
         self.imshow(out, title=[self.class_names[int(x)] for x in classes])
         plt.show()
 
+    def plot_loss_curves(self, train_losses, val_losses, train_acc, val_acc):
+        """Plot training and validation loss and accuracies curves on the same axes."""
+        fig, axs = plt.subplots(2, 1, figsize=(10, 12))
+
+        axs[0].plot(train_losses, label='Training Loss', marker='o')
+        axs[0].plot(val_losses, label='Validation Loss', marker='o')
+        axs[0].set_xlabel('Epochs')
+        axs[0].set_ylabel('Loss')
+        axs[0].set_title('Training and Validation Loss Over Epochs')
+        axs[0].legend()
+        axs[0].grid(True)
+
+        axs[1].plot(train_acc, label='Training Accuracy', marker='o')
+        axs[1].plot(val_acc, label='Validation Accuracy', marker='o')
+        axs[1].set_xlabel('Epochs')
+        axs[1].set_ylabel('Accuracy')
+        axs[1].set_title('Training and Validation Accuracy Over Epochs')
+        axs[1].legend()
+        axs[1].grid(True)
+
+        plt.tight_layout()
+        # plt.show()
+
     def train_model(self, criterion, optimizer, scheduler, num_epochs=25):
         print("Training starting...")
         since = time.time()
+
+        # track the loss for each epoch
+        train_losses = []
+        val_losses = []
+
+        # track accuracies
+        train_acc = []
+        val_acc = []
 
         # Create a temporary directory to save training checkpoints
         with TemporaryDirectory() as tempdir:
@@ -186,6 +217,14 @@ class modelbb():
 
                     print(f'{phase} Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
 
+                    # Track losses
+                    if phase == 'train':
+                        train_losses.append(epoch_loss)
+                        train_acc.append(epoch_acc.cpu())
+                    else:
+                        val_losses.append(epoch_loss)
+                        val_acc.append(epoch_acc.cpu())
+
                     # deep copy the model
                     if phase == 'val' and epoch_acc > best_acc:
                         best_acc = epoch_acc
@@ -199,7 +238,9 @@ class modelbb():
 
             # load best model weights
             self.model.load_state_dict(torch.load(best_model_params_path, weights_only=True))
-        # return model
+        
+        self.plot_loss_curves(train_losses, val_losses, train_acc, val_acc)
+        # return train_losses, val_losses
 
     def test_accuracy(self):
         self.model.eval()
@@ -251,17 +292,17 @@ class modelbb():
 
 
 def load_test():
-    bb = modelbb(BATCH_SIZE=32, load_model=True)
+    bb = modelbb(BATCH_SIZE=32, load_model=False)
 
-    # criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss()
 
-    # # Observe that all parameters are being optimized
-    # optimizer_ft = optim.SGD(bb.model.parameters(), lr=0.001, momentum=0.9)
+    # Observe that all parameters are being optimized
+    optimizer_ft = optim.SGD(bb.model.parameters(), lr=0.001, momentum=0.9)
 
-    # # Decay LR by a factor of 0.1 every 7 epochs
-    # exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
+    # Decay LR by a factor of 0.1 every 7 epochs
+    exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
 
-    # bb.train_model(criterion=criterion, optimizer=optimizer_ft, scheduler=exp_lr_scheduler)
+    bb.train_model(criterion=criterion, optimizer=optimizer_ft, scheduler=exp_lr_scheduler,num_epochs=2)
     bb.visualize_model()
     bb.test_accuracy()
     plt.show()
